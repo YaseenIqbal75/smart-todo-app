@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODO App</title>
+</head>
+<body>
+    <h1>Welcome to Todo App!</h1>
+    <div style="border: 1px solid black; width:fit-content;">
+    <h3 style="padding: 10px;">Add New Task</h3>
+    <form action="/add" method="post">
+        <div style="padding: 10px;">
+            <label for="Title">Title :</label><br>
+            <input type="text" id="Title" name="Title"><br>
+            <label for="Description">Description :</label><br>
+            <textarea name="Description" id="Description" rows="5" cols="30"></textarea><br>
+            <input type="submit" value="Add Task">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <ul class="flashes">
+                {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %} 
+            {% endwith %}
+
+            
+        </div>
+    </form>
+    </div>
+
+
+    <h3>List of Tasks :</h3>
+    {% for task in todo_list %}
+    <div style="border: 1px solid black; padding: 10px;">
+    <p><b>{{task.id}}</b> | {% if task.isComplete%} <s>{{task.title}}</s> {%else%} {{task.title}} {% endif %}</p>
+    
+    <p><b><i>Description : </i></b> {{task.description}}</p>
+
+    <span><b><i>Status :</i></b></span> 
+    {% if task.isComplete == False %}
+    
+    <span style="color: red;" >Pending</span>
+    {% else %}
+    <span style="color: green;">Completed</span>
+    {% endif %}
+    <br><br>
+    <a href="/update/{{ task.id }}">Update</a>
+    <a href="/delete/{{ task.id }}">Delete</a>
+    </div>
+    {% endfor %}
+</body>
+</html> 
