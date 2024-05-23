@@ -16,6 +16,7 @@
             <label for="Description">Description :</label><br>
             <textarea name="Description" id="Description" rows="5" cols="30"></textarea><br>
             <input type="submit" value="Add Task">
+            <button onclick="callGenerateDescription(event)">Generate Description <b>AI</b></button>
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
             <ul class="flashes">
@@ -52,4 +53,16 @@
     </div>
     {% endfor %}
 </body>
+<script>
+    function callGenerateDescription(event){
+        event.preventDefault();
+        console.log("")
+        const title = document.getElementById("Title").value
+        fetch(`/generate_description?title=${title}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("Description").value = data.description
+        }).catch(error => console.error("Error: " , error))
+    }
+</script>
 </html> 

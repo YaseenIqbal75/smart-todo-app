@@ -1,7 +1,10 @@
-from flask import Flask,render_template,request,url_for,redirect,flash # import Flask class from flask module
-from flask_sqlalchemy import SQLAlchemy #SQLAlchemy #import SQLAlchemy class from flasl-sqlalchemy module
-from sqlalchemy.sql import text # import text form sql
+from flask import Flask,render_template,request,url_for,redirect,flash, jsonify
+from flask_sqlalchemy import SQLAlchemy
 import datetime as dt
+from transformers import pipeline
+from transformers import AutoTokenizer, MistralForCausalLM
+
+
 #initialize the SQLalchemy object
 db = SQLAlchemy()
 
@@ -41,7 +44,6 @@ class Task(db.Model):
         return f"Task('{self.title}', '{self.description}', '{self.deadline}', '{self.flag}')"
 
 
-    
 
 @app.route('/')
 def home_page():
@@ -78,6 +80,25 @@ def delete(task_id):
     db.session.commit()
     return redirect(url_for("home_page"))
 
+
+@app.route("/generate_description")
+def generate_description():
+    title = request.args.get('title')
+    print("Title is ===> " , title)
+    if not title:
+        return jsonify({"description" : "title is Empty"}), 400
+    # model = MistralForCausalLM.from_pretrained("mistralai/Mistral-7B-v0.1")
+    # tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")
+    generator = pipeline("text-generation", model="gpt2")
+    prompt = f"Write a task description for the Task: '{title}'"
+    ai_response = generator(prompt, num_return_sequences = 1, max_length=90)
+    # inputs = tokenizer(prompt,return_tensors="pt")
+    # print(prompt)
+    print(ai_response)
+    # generate_ids = model.generate(inputs.input_ids, max_length=30)
+    # response = tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+    # print(response)
+    return jsonify({"description" :ai_response[0]['generated_text']}) , 200
 
 
 if __name__ == "__main__":  
