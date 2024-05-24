@@ -2,7 +2,11 @@ from flask import Flask,render_template,request,url_for,redirect,flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import datetime as dt
 from transformers import pipeline
-from transformers import AutoTokenizer, MistralForCausalLM
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+
+
 
 
 #initialize the SQLalchemy object
@@ -13,6 +17,13 @@ db_name = "todo.db"
 
 #initializing the app
 app = Flask(__name__)
+
+job_store = { 
+    'default' :SQLAlchemyJobStore(url="sqlite:///jobs.sqlite")
+    }
+scheduler = BackgroundScheduler(jobstores = job_store)
+
+scheduler.start()
 
 app.secret_key = "arslanwaqar421"
 
@@ -45,9 +56,20 @@ class Task(db.Model):
 
 
 
+
+def send_alert(task_title):
+    print(f"Your task {task_title} is due in 1 hour!")
+
+def schedule_task_alert(task_title, task_deadline):
+    alert_time = task_deadline - dt.timedelta(hours=1)
+    scheduler.add_job(func=send_alert, trigger='date', run_date = alert_time, args=[task_title])
+    print("Alert added successfully")
+    scheduler.print_jobs()
+
 @app.route('/')
 def home_page():
     todo_list = Task.query.all()
+    scheduler.print_jobs()
     return render_template("base.html" ,todo_list = todo_list)
 
 @app.route("/add", methods =["POST"])
@@ -59,9 +81,11 @@ def add():
         return redirect(url_for("home_page"))
     
     current_time = dt.datetime.now()
-    new_task = Task(title,description,current_time,current_time + dt.timedelta(days=1) )
+    ending_time = current_time + dt.timedelta(hours=1, minutes=1 )
+    new_task = Task(title,description,current_time,ending_time)
     db.session.add(new_task)
     db.session.commit()
+    schedule_task_alert(title,ending_time)
     flash("Task Added Successfully!")
     return redirect(url_for("home_page"))
 
@@ -88,7 +112,7 @@ def generate_description():
     if not title:
         return jsonify({"description" : "title is Empty"}), 400
     # model = MistralForCausalLM.from_pretrained("mistralai/Mistral-7B-v0.1")
-    # tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")
+    # tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")pip
     generator = pipeline("text-generation", model="gpt2")
     prompt = f"Write a task description for the Task: '{title}'"
     ai_response = generator(prompt, num_return_sequences = 1, max_length=90)
@@ -100,6 +124,9 @@ def generate_description():
     # print(response)
     return jsonify({"description" :ai_response[0]['generated_text']}) , 200
 
+
+# Ensure the scheduler shuts down when the app exits
+atexit.register(lambda: scheduler.shutdown())
 
 if __name__ == "__main__":  
     with app.app_context():
