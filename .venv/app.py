@@ -5,6 +5,7 @@ from transformers import pipeline
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from flask_socketio import SocketIO
 
 
 
@@ -26,6 +27,8 @@ scheduler = BackgroundScheduler(jobstores = job_store)
 scheduler.start()
 
 app.secret_key = "arslanwaqar421"
+
+socketio = SocketIO(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_name
 
@@ -52,19 +55,27 @@ class Task(db.Model):
 
 
     def __repr__(self):
-        return f"Task('{self.title}', '{self.description}', '{self.deadline}', '{self.flag}')"
+        return f"Task( '{self.id}','{self.title}', '{self.description}', '{self.Creation_Timestamp}' ,'{self.Ending_Timestamp}', '{self.isComplete}')"
 
 
 
 
 def send_alert(task_title):
-    print(f"Your task {task_title} is due in 1 hour!")
+    with app.app_context():
+        print('alert sent to client')
+        task = Task.query.order_by(Task.Creation_Timestamp.desc()).first()
+        socketio.emit("alert", {"task_title" : task_title ,
+                                "task_id" : task.id})
 
 def schedule_task_alert(task_title, task_deadline):
     alert_time = task_deadline - dt.timedelta(hours=1)
     scheduler.add_job(func=send_alert, trigger='date', run_date = alert_time, args=[task_title])
     print("Alert added successfully")
     scheduler.print_jobs()
+
+@socketio.on('my_event')
+def handle_message(data):
+    print('Connected '+ data['data'])
 
 @app.route('/')
 def home_page():
@@ -81,7 +92,7 @@ def add():
         return redirect(url_for("home_page"))
     
     current_time = dt.datetime.now()
-    ending_time = current_time + dt.timedelta(hours=1, minutes=1 )
+    ending_time = current_time + dt.timedelta(hours=1, seconds=15)
     new_task = Task(title,description,current_time,ending_time)
     db.session.add(new_task)
     db.session.commit()
@@ -111,17 +122,10 @@ def generate_description():
     print("Title is ===> " , title)
     if not title:
         return jsonify({"description" : "title is Empty"}), 400
-    # model = MistralForCausalLM.from_pretrained("mistralai/Mistral-7B-v0.1")
-    # tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")pip
     generator = pipeline("text-generation", model="gpt2")
     prompt = f"Write a task description for the Task: '{title}'"
     ai_response = generator(prompt, num_return_sequences = 1, max_length=90)
-    # inputs = tokenizer(prompt,return_tensors="pt")
-    # print(prompt)
     print(ai_response)
-    # generate_ids = model.generate(inputs.input_ids, max_length=30)
-    # response = tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-    # print(response)
     return jsonify({"description" :ai_response[0]['generated_text']}) , 200
 
 
@@ -131,6 +135,4 @@ atexit.register(lambda: scheduler.shutdown())
 if __name__ == "__main__":  
     with app.app_context():
         db.create_all() 
-    app.run(debug=True)
-    
-
+    socketio.run(app, debug= True)
