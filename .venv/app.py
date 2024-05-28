@@ -28,7 +28,7 @@ scheduler.start()
 
 app.secret_key = "arslanwaqar421"
 
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_name
 
@@ -67,8 +67,8 @@ def send_alert(task_title):
         socketio.emit("alert", {"task_title" : task_title ,
                                 "task_id" : task.id})
 
-def schedule_task_alert(task_title, task_deadline):
-    alert_time = task_deadline - dt.timedelta(hours=1)
+def schedule_task_alert(task_title, alert_time):
+    # alert_time = task_deadline - dt.timedelta(hours=1)
     scheduler.add_job(func=send_alert, trigger='date', run_date = alert_time, args=[task_title])
     print("Alert added successfully")
     scheduler.print_jobs()
@@ -87,16 +87,31 @@ def home_page():
 def add():
     title = request.form.get("Title")
     description = request.form.get("Description")
+    reminder = request.form.get('Reminder')
+    print("Reminder from form :", reminder)
     if not title:
         flash("Title cannot be empty", "error")
         return redirect(url_for("home_page"))
-    
     current_time = dt.datetime.now()
     ending_time = current_time + dt.timedelta(hours=1, seconds=15)
     new_task = Task(title,description,current_time,ending_time)
     db.session.add(new_task)
     db.session.commit()
-    schedule_task_alert(title,ending_time)
+    if reminder:
+        #convert to python datetime object
+        alert_time = dt.datetime.strptime(reminder, '%Y-%m-%dT%H:%M')
+        # verify alert time if its valid or not
+        if alert_time > current_time and alert_time < ending_time:
+            schedule_task_alert(title,alert_time)
+            print("Custom alert time : " , alert_time)
+        else:
+            flash("Invalid Reminder Time")
+            return redirect(url_for("home_page"))
+
+    else:
+        alert_time = ending_time - dt.timedelta(hours=1)
+        schedule_task_alert(title,alert_time)
+
     flash("Task Added Successfully!")
     return redirect(url_for("home_page"))
 

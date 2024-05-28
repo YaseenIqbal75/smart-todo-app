@@ -21,7 +21,11 @@
         </div>
         </div>
       </div>
+
+    <!--  Welcoming message-->
     <h1>Welcome to Todo App!</h1>
+
+    <!-- Form to Task Info -->
     <div style="border: 1px solid black; width:fit-content;">
     <h3 style="padding: 10px;">Add New Task</h3>
     <form action="/add" method="post">
@@ -30,6 +34,9 @@
             <input type="text" id="Title" name="Title"><br>
             <label for="Description">Description :</label><br>
             <textarea name="Description" id="Description" rows="5" cols="30"></textarea><br>
+            <label for="Reminder">Set Reminder:</label><br>
+            <input type="datetime-local" id="Reminder" name="Reminder">
+            <br><br>
             <input type="submit" value="Add Task">
             <button onclick="callGenerateDescription(event)">Generate Description <b>AI</b></button>
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -47,7 +54,7 @@
     </form>
     </div>
 
-    <!-- <button onclick="alert('This is a message')"></button> -->
+    <!-- List of Tasks -->
     <h3>List of Tasks :</h3>
      {% for task in todo_list %}
     <div style="border: 1px solid black; padding: 10px;">
@@ -68,6 +75,8 @@
     </div>
     {% endfor %}
 </body>
+
+<!-- Javascript Code -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"> </script>
 <script type="text/javascript" charset="utf-8">
     var socket = io('http://127.0.0.1:5000'); // Replace with your server's host and port
