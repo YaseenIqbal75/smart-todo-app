@@ -6,6 +6,21 @@
     <title>TODO App</title>
 </head>
 <body>
+    <!-- alert modal -->
+    <div id="id01" class="w3-modal" >
+        <div class="w3-modal-content">
+          <div class="w3-container" >
+            <h3 id ='reminder'></h3>
+            <p id="modalText"></p>
+            <span>
+                <button class="w3-button w3-green" id="doneButton" style="display: none;">Done</button>
+            </span>
+            <span>
+                <button class="w3-button w3-red" id="notDoneButton" style="display: none;">Not Done</button>
+            </span>
+        </div>
+        </div>
+      </div>
     <h1>Welcome to Todo App!</h1>
     <div style="border: 1px solid black; width:fit-content;">
     <h3 style="padding: 10px;">Add New Task</h3>
@@ -32,9 +47,9 @@
     </form>
     </div>
 
-
+    <!-- <button onclick="alert('This is a message')"></button> -->
     <h3>List of Tasks :</h3>
-    {% for task in todo_list %}
+     {% for task in todo_list %}
     <div style="border: 1px solid black; padding: 10px;">
     <p><b>{{task.id}}</b> | {% if task.isComplete%} <s>{{task.title}}</s> {%else%} {{task.title}} {% endif %}</p>
     
@@ -53,6 +68,60 @@
     </div>
     {% endfor %}
 </body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"> </script>
+<script type="text/javascript" charset="utf-8">
+    var socket = io('http://127.0.0.1:5000'); // Replace with your server's host and port
+
+    socket.on('connect', function() {
+        socket.emit('my_event', {data: 'I\'m connected!'});
+    });
+
+    socket.on("alert", function(data){
+        console.log("Alert recieved" , data.task_title)
+        showModal(data.task_title, data.task_id)
+    })
+
+    function showModal(task_title, task_id){
+        console.log("showing model")
+        document.getElementById('modalText').innerText = `Task: ${task_title}`
+        document.getElementById('id01').style.display = 'block'
+        let heading = document.getElementById('reminder')
+        heading.innerText = "Reminder!"
+        heading.style.color = 'Red'
+        heading.style.fontWeight = 'bold'
+        heading.style.alignSelf= 'center'
+        let modal = document.getElementById('id01')
+        modal.style.border = '1px solid black'
+        modal.style.padding  = '10px'
+        modal.style.width = 'fit-content'
+        document.getElementById('doneButton').style.display = "inline-block"
+        document.getElementById('notDoneButton').style.display = "inline-block"
+        const notDoneButton = document.getElementById('notDoneButton')
+        const donebutton = document.getElementById('doneButton')
+        // notDoneButton.style.display = 'inline-block'
+        donebutton.onclick= function(){
+            console.log('inside')
+            updateTaskStatus(task_id)
+            document.getElementById('id01').style.display = 'none'
+        }
+
+        notDoneButton.onclick = function(){
+            document.getElementById('id01').style.display = 'none'
+        }
+    }
+
+    function updateTaskStatus(id){
+        fetch(`/update/${id}`).then(response => {
+            if(response.ok){
+                location.reload()
+            }
+            else{
+                console.error('Failed to update task')
+            }
+        })
+        .catch(error=>console.error('Error updating task:', error))
+    }
+</script>
 <script>
     function callGenerateDescription(event){
         event.preventDefault();
