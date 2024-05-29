@@ -64,11 +64,11 @@ def send_alert(task_title):
     with app.app_context():
         print('alert sent to client')
         task = Task.query.order_by(Task.Creation_Timestamp.desc()).first()
-        socketio.emit("alert", {"task_title" : task_title ,
-                                "task_id" : task.id})
+        socketio.emit("alert", {"task_title" : task_title,
+                                "task_id" : task.id,
+                                "task_status" : task.isComplete})
 
 def schedule_task_alert(task_title, alert_time):
-    # alert_time = task_deadline - dt.timedelta(hours=1)
     scheduler.add_job(func=send_alert, trigger='date', run_date = alert_time, args=[task_title])
     print("Alert added successfully")
     scheduler.print_jobs()
