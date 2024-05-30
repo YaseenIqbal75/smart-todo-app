@@ -1,3 +1,4 @@
+# all necessary imports
 from flask import Flask,render_template,request,url_for,redirect,flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import datetime as dt
@@ -8,36 +9,43 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from flask_socketio import SocketIO
 
 
-
-
-#initialize the SQLalchemy object
+# initialize the SQLalchemy object
 db = SQLAlchemy()
 
 # name of the database
 db_name = "todo.db" 
 
-#initializing the app
+# initializing the app
 app = Flask(__name__)
 
+# persistant job store using sqlite database
 job_store = { 
     'default' :SQLAlchemyJobStore(url="sqlite:///jobs.sqlite")
     }
+
+# initializing scheduler for alert messages
 scheduler = BackgroundScheduler(jobstores = job_store)
 
 scheduler.start()
 
+# app secret key for session it can be anything
 app.secret_key = "arslanwaqar421"
 
+# socketio object for enabling the cross communication between server and client
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+
+# flask app db configurations and initalization
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_name
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
 db.init_app(app)    
 
+
+# Creating a class to map to the database table named "Task"
 class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # Added autoincrement=True
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     Ending_Timestamp = db.Column(db.DateTime)
@@ -59,62 +67,74 @@ class Task(db.Model):
 
 
 
-
-def send_alert(task_title):
+# function to send alert to the client with the necessary data
+def send_alert(task_title,task_id,task_status):
     with app.app_context():
         print('alert sent to client')
-        task = Task.query.order_by(Task.Creation_Timestamp.desc()).first()
         socketio.emit("alert", {"task_title" : task_title,
-                                "task_id" : task.id,
-                                "task_status" : task.isComplete})
+                                "task_id" : task_id,
+                                "task_status" : task_status})
 
+# function to schedule the task alert currently
 def schedule_task_alert(task_title, alert_time):
-    scheduler.add_job(func=send_alert, trigger='date', run_date = alert_time, args=[task_title])
+    task = Task.query.order_by(Task.Creation_Timestamp.desc()).first()
+    print("Task:", task)
+    scheduler.add_job(func=send_alert, trigger='date', run_date = alert_time, args=[task_title,task.id,task.isComplete])
     print("Alert added successfully")
     scheduler.print_jobs()
 
+# socket decorator to see if the sever and client are connected successfuly
 @socketio.on('my_event')
 def handle_message(data):
     print('Connected '+ data['data'])
 
+# route for homepage that displays all the tasks
 @app.route('/')
 def home_page():
     todo_list = Task.query.all()
     scheduler.print_jobs()
     return render_template("base.html" ,todo_list = todo_list)
 
+@app.route('/updatelist')
+def updated_list():
+    return render_template('list.html', todo_list = Task.query.all())
+
+# route for adding the new task, POST request from the client is handled here
 @app.route("/add", methods =["POST"])
 def add():
     title = request.form.get("Title")
     description = request.form.get("Description")
     reminder = request.form.get('Reminder')
-    print("Reminder from form :", reminder)
+
     if not title:
-        flash("Title cannot be empty", "error")
-        return redirect(url_for("home_page"))
-    current_time = dt.datetime.now()
-    ending_time = current_time + dt.timedelta(hours=1, seconds=15)
-    new_task = Task(title,description,current_time,ending_time)
-    db.session.add(new_task)
-    db.session.commit()
-    if reminder:
-        #convert to python datetime object
-        alert_time = dt.datetime.strptime(reminder, '%Y-%m-%dT%H:%M')
-        # verify alert time if its valid or not
-        if alert_time > current_time and alert_time < ending_time:
-            schedule_task_alert(title,alert_time)
-            print("Custom alert time : " , alert_time)
-        else:
-            flash("Invalid Reminder Time")
-            return redirect(url_for("home_page"))
-
+        return jsonify({"success": False, "redirect": url_for("home_page"), "message": "Title cannot be empty"}), 400
     else:
-        alert_time = ending_time - dt.timedelta(hours=1)
-        schedule_task_alert(title,alert_time)
+        current_time = dt.datetime.now()
+        ending_time = current_time + dt.timedelta(hours=1, seconds=5)
+        new_task = Task(title,description,current_time,ending_time)
+        db.session.add(new_task)
+        print('=========================================')
+        # by default the reminder appears 1 hour before the dead line
+        if reminder:
+            # convert to python datetime object
+            alert_time = dt.datetime.strptime(reminder, '%Y-%m-%dT%H:%M')
+            # verify alert time if its valid or not
+            if alert_time > current_time:
+                # set custom remider if the alert_time is valid
+                db.session.commit()
+                schedule_task_alert(title,alert_time)
+                print("Custom alert time : " , alert_time)
+            else:
+                return jsonify({"success": False, "redirect": url_for("home_page"), "message": "Invalid Reminder Time"}), 400
 
-    flash("Task Added Successfully!")
-    return redirect(url_for("home_page"))
+        else:
+            db.session.commit()
+            alert_time = ending_time - dt.timedelta(hours=1)
+            schedule_task_alert(title,alert_time)
+    redirect = render_template('list.html' , todo_list = Task.query.all())
+    return jsonify({"success": True, "redirect": redirect, "message": "Task Added successfully"})
 
+# update the task status to done or not done
 @app.route("/update/<int:task_id>")
 def update(task_id):
     update_task = Task.query.filter_by(id=task_id).first()
@@ -122,15 +142,15 @@ def update(task_id):
     db.session.commit()
     return redirect(url_for("home_page"))
 
-
+# delete a specific task
 @app.route("/delete/<int:task_id>")
 def delete(task_id):
     delete_task = Task.query.filter_by(id = task_id).first()
     db.session.delete(delete_task)
     db.session.commit()
-    return redirect(url_for("home_page"))
+    return render_template("list.html", todo_list = Task.query.all())
 
-
+# generate AI description through AI model gpt2 using the transformers library
 @app.route("/generate_description")
 def generate_description():
     title = request.args.get('title')
@@ -140,8 +160,15 @@ def generate_description():
     generator = pipeline("text-generation", model="gpt2")
     prompt = f"Write a task description for the Task: '{title}'"
     ai_response = generator(prompt, num_return_sequences = 1, max_length=90)
-    print(ai_response)
     return jsonify({"description" :ai_response[0]['generated_text']}) , 200
+
+@app.route("/update_reminder/<int:id>")
+def update_from_reminder(id):
+    update_task = Task.query.filter_by(id=id).first()
+    update_task.isComplete =  not update_task.isComplete
+    status = update_task.isComplete
+    db.session.commit()
+    return render_template('list.html' , todo_list = Task.query.all())
 
 
 # Ensure the scheduler shuts down when the app exits

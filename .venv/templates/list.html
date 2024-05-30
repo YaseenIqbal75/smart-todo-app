@@ -1,0 +1,18 @@
+{% for task in todo_list %}
+<div style="border: 1px solid black; padding: 10px;">
+<p id='tasktitle-${task.id}'><b>{{task.id}}</b> | {% if task.isComplete%} <s>{{task.title}}</s> {%else%} {{task.title}} {% endif %}</p>
+
+<p><b><i>Description : </i></b> {{task.description}}</p>
+
+<span><b><i>Status :</i></b></span> 
+{% if task.isComplete == False %}
+
+<span style="color: red;" >Pending</span>
+{% else %}
+<span style="color: green;">Completed</span>
+{% endif %}
+<br><br>
+<button onclick="updateTaskStatus({{ task.id }})">Update</button>
+<Button onclick="deleteTask({{task.id}})">Delete</Button>
+</div>
+{% endfor %}
