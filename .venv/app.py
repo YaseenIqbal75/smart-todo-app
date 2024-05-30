@@ -156,7 +156,7 @@ def generate_description():
     title = request.args.get('title')
     print("Title is ===> " , title)
     if not title:
-        return jsonify({"description" : "title is Empty"}), 400
+        return jsonify({"description" : "Title cannot be empty to generate AI description."}), 400
     generator = pipeline("text-generation", model="gpt2")
     prompt = f"Write a task description for the Task: '{title}'"
     ai_response = generator(prompt, num_return_sequences = 1, max_length=90)

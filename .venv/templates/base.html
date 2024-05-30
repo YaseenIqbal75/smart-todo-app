@@ -179,7 +179,16 @@
         event.preventDefault();
         const title = document.getElementById("Title").value
         fetch(`/generate_description?title=${title}`)
-        .then(response => response.json())
+        .then(response => {
+            if (response.status === 400) {
+            return response.json().then(data => {
+                alert(data.description);
+                throw new Error(data.description);
+            });
+        } else {
+            return response.json();
+        }
+        })
         .then(data => {
             document.getElementById("Description").value = data.description
         }).catch(error => console.error("Error: " , error))
