@@ -166,6 +166,7 @@
             if (response.status === 200 && response.body.success) {
                 document.getElementById('list-group').innerHTML = response.body.redirect;
                 form.reset()
+                alert(response.body.message)
             } else {
                 alert(response.body.message);
                 window.location.href = response.body.redirect;
