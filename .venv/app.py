@@ -70,7 +70,6 @@ class Task(db.Model):
 # function to send alert to the client with the necessary data
 def send_alert(task_title,task_id,task_status):
     with app.app_context():
-        print('alert sent to client')
         socketio.emit("alert", {"task_title" : task_title,
                                 "task_id" : task_id,
                                 "task_status" : task_status})
@@ -78,9 +77,7 @@ def send_alert(task_title,task_id,task_status):
 # function to schedule the task alert currently
 def schedule_task_alert(task_title, alert_time):
     task = Task.query.order_by(Task.Creation_Timestamp.desc()).first()
-    print("Task:", task)
     scheduler.add_job(func=send_alert, trigger='date', run_date = alert_time, args=[task_title,task.id,task.isComplete])
-    print("Alert added successfully")
     scheduler.print_jobs()
 
 # socket decorator to see if the sever and client are connected successfuly
@@ -110,11 +107,11 @@ def add():
         return jsonify({"success": False, "redirect": url_for("home_page"), "message": "Title cannot be empty"}), 400
     else:
         current_time = dt.datetime.now()
-        ending_time = current_time + dt.timedelta(hours=1, seconds=5)
+        # by default the ending time is set to 24 hours after the task has been created
+        ending_time = current_time + dt.timedelta(hours=24)
         new_task = Task(title,description,current_time,ending_time)
         db.session.add(new_task)
-        print('=========================================')
-        # by default the reminder appears 1 hour before the dead line
+        # by default the reminder appears 3 hour before the dead line
         if reminder:
             # convert to python datetime object
             alert_time = dt.datetime.strptime(reminder, '%Y-%m-%dT%H:%M')
@@ -123,13 +120,13 @@ def add():
                 # set custom remider if the alert_time is valid
                 db.session.commit()
                 schedule_task_alert(title,alert_time)
-                print("Custom alert time : " , alert_time)
             else:
                 return jsonify({"success": False, "redirect": url_for("home_page"), "message": "Invalid Reminder Time"}), 400
 
         else:
             db.session.commit()
-            alert_time = ending_time - dt.timedelta(hours=1)
+            # if the reminder not given then default reminder is generated 3 hours before the deadline
+            alert_time = ending_time - dt.timedelta(hours=3)
             schedule_task_alert(title,alert_time)
     redirect = render_template('list.html' , todo_list = Task.query.all())
     return jsonify({"success": True, "redirect": redirect, "message": "Task Added successfully"})
